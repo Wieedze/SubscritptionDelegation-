@@ -57,8 +57,16 @@ async function main() {
   console.log("Subscriber smart acc :", smartAccount.address);
 
   // 2. Deploy the smart account if needed (the EOA owner pays gas).
+  // Wait for each tx receipt before sending the next so the public RPC doesn't
+  // reuse a pending nonce ("replacement transaction underpriced").
   const deployTx = await deploySmartAccount(smartAccount, subscriberWallet);
-  console.log(deployTx ? `Deployed smart account: ${deployTx}` : "Smart account already deployed.");
+  if (deployTx) {
+    console.log(`Deploying smart account: ${deployTx}`);
+    await client.waitForTransactionReceipt({ hash: deployTx });
+    console.log("  ↳ confirmed.");
+  } else {
+    console.log("Smart account already deployed.");
+  }
 
   const token = await readToken(client, config.tokenAddress);
   const mintAmount = process.argv[3] ?? (Number(amountPerPeriod) * 3).toString();
@@ -73,6 +81,7 @@ async function main() {
     functionName: "mint",
     args: [smartAccount.address, mintRaw],
   });
+  await client.waitForTransactionReceipt({ hash: mintTx });
   console.log(`Minted ${mintAmount} ${token.symbol} to smart account: ${mintTx}`);
 
   // 4 + 5. Build, pin, sign, persist.
