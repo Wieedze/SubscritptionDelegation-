@@ -176,11 +176,12 @@ export async function build7702Authorization(params: {
   };
 }
 
-export interface ChargeViaRelayerParams {
+export interface ChargeBundleParams {
   relayerUrl: string;
   chainId: number;
   capabilities: ChainCapabilities;
-  signedDelegation: Delegation;
+  /** Already JSON-safe delegations (from `toRelayerJson` or `decodeDelegations` + `toRelayerJson`). */
+  permissionContext: unknown[];
   token: { address: Address; decimals: number };
   /** Subscription amount to send to the org (token atoms). */
   workAmount: bigint;
@@ -193,9 +194,10 @@ export interface ChargeViaRelayerParams {
  * Charge one period via the 1Shot relayer: estimate the fee, then submit a
  * bundle of [fee transfer → feeCollector, subscription transfer → recipient].
  * No ETH spent by anyone — the relayer is paid in the fee token. Returns the
- * relayer task id.
+ * relayer task id. Works with both local-signer delegations and ERC-7715
+ * wallet-granted permission contexts.
  */
-export async function chargeViaRelayer(params: ChargeViaRelayerParams): Promise<string> {
+export async function chargeBundleViaRelayer(params: ChargeBundleParams): Promise<string> {
   const { capabilities: caps, token } = params;
 
   const buildBundle = (feeAmount: bigint) => ({
@@ -203,7 +205,7 @@ export async function chargeViaRelayer(params: ChargeViaRelayerParams): Promise<
     ...(params.authorization ? { authorizationList: [params.authorization] } : {}),
     transactions: [
       {
-        permissionContext: [toRelayerJson(params.signedDelegation)],
+        permissionContext: params.permissionContext,
         executions: [
           {
             target: token.address,
@@ -230,22 +232,37 @@ export async function chargeViaRelayer(params: ChargeViaRelayerParams): Promise<
 
   // Estimate with a mock fee (0.01 of the fee token), then use the required amount.
   const mockFee = 10_000n; // 0.01 USDC (6 decimals)
-  const firstParams = buildBundle(mockFee);
   const estimate = await rpc<Estimate7710Result>(
     params.relayerUrl,
     "relayer_estimate7710Transaction",
-    firstParams,
+    buildBundle(mockFee),
   );
   if (!estimate.success) throw new Error(`1Shot estimate failed: ${estimate.error}`);
 
   const requiredFee = BigInt(estimate.requiredPaymentAmount ?? mockFee.toString());
-  const sendParams = buildBundle(requiredFee);
-
-  const taskId = await rpc<string>(params.relayerUrl, "relayer_send7710Transaction", {
-    ...sendParams,
+  return rpc<string>(params.relayerUrl, "relayer_send7710Transaction", {
+    ...buildBundle(requiredFee),
     context: estimate.context,
   });
-  return taskId;
+}
+
+export interface ChargeViaRelayerParams {
+  relayerUrl: string;
+  chainId: number;
+  capabilities: ChainCapabilities;
+  signedDelegation: Delegation;
+  token: { address: Address; decimals: number };
+  workAmount: bigint;
+  recipient: Address;
+  authorization?: unknown;
+}
+
+/** Local-signer convenience wrapper around {@link chargeBundleViaRelayer}. */
+export async function chargeViaRelayer(params: ChargeViaRelayerParams): Promise<string> {
+  return chargeBundleViaRelayer({
+    ...params,
+    permissionContext: [toRelayerJson(params.signedDelegation)],
+  });
 }
 
 export interface RelayerStatus {

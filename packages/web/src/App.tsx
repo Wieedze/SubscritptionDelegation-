@@ -16,6 +16,7 @@ import { localStore } from "./store.js";
 import { BUNDLER_URL, MINTABLE_ABI, PINATA_JWT, readToken, shortAddr } from "./lib.js";
 import { CreateForm, type CreateFormValues } from "./CreateForm.js";
 import { SubscriptionList } from "./SubscriptionList.js";
+import { AdvancedPermissions } from "./AdvancedPermissions.js";
 
 export function App() {
   const { address, isConnected, chainId } = useAccount();
@@ -177,6 +178,8 @@ export function App() {
           <CreateForm onSubmit={onCreate} disabled={busy != null} />
         </section>
       )}
+
+      {isConnected && !wrongChain && <AdvancedPermissions />}
 
       <section className="card">
         <h2>Subscriptions</h2>
