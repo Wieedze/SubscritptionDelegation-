@@ -5,16 +5,14 @@
   "type": "module",
   "main": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./node": "./src/node.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@metamask/smart-accounts-kit": "^1.6.0",
-    "viem": "^2.31.4"
-  },
-  "devDependencies": {
-    "typescript": "^5.7.0"
+    "viem": "2.52.2"
   }
 }

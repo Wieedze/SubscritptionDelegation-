@@ -1,33 +1,43 @@
 # safe-subscriptions — Kickoff
 
-Abonnements crypto récurrents : un **Gnosis Safe** autorise une **organisation** à
-prélever un montant ERC20 fixe **chaque mois**, via le **Safe Allowance Module**.
-Le JSON d'accord (`subscription-agreement.example.json`) porte **les termes du
-contrat entre l'organisation et l'abonné** — le on-chain ne fait qu'appliquer le
-caveat (montant max par période).
+Abonnements crypto récurrents : un **smart account** (DeleGator MetaMask) autorise
+une **organisation** à prélever un montant ERC20 fixe **chaque période**, via une
+**délégation ERC-7710** portant le caveat **`erc20PeriodTransfer`** (montant max
+par période, reset automatique). Le JSON d'accord (`subscription-agreement.example.json`)
+porte **les termes du contrat** entre l'organisation et l'abonné, **épinglé sur
+IPFS** ; l'on-chain ne fait qu'appliquer le caveat (plafond par période).
+
+> ℹ️ **Pivot vs. première version.** Le design initial visait un Gnosis Safe + Safe
+> Allowance Module (parce qu'il supposait l'abonné = un Safe, qui signe en ERC-1271).
+> On a basculé sur le **MetaMask Delegation Toolkit** (ERC-7710/4337) : l'abonné est
+> un **smart account DeleGator contrôlé par un EOA** (signature ECDSA), ce qui est
+> mieux aligné avec ARP et donne un primitif d'abonnement natif (`erc20PeriodTransfer`).
 
 ---
 
 ## Le concept
 
-- L'abonné = un **Safe**. L'organisation = un **delegate** (adresse qui encaisse).
-- Les owners du Safe signent UNE fois : activation du module + `setAllowance`.
-- Le « caveat » = l'allowance avec **reset mensuel** (`resetTimeMin = 43200`).
-- L'orga appelle `executeAllowanceTransfer` chaque mois → prélèvement plafonné.
-- Révocation à tout moment : `removeAllowance` / `removeDelegate`.
+- L'abonné = un **smart account DeleGator (Hybrid)**, possédé/signé par un **EOA**.
+  L'organisation = un **delegate** (EOA simple qui encaisse).
+- L'EOA signe **une fois** la délégation (ECDSA) : caveat `erc20PeriodTransfer`
+  (`periodAmount`, `periodDuration = 2592000` ≈ 30 j, `startDate`).
+- L'orga appelle `DelegationManager.redeemDelegations` chaque période → prélèvement
+  plafonné, transféré vers son adresse.
+- Révocation à tout moment : `disableDelegation` (user op signée par le smart account).
 
 Le **JSON** = les termes lisibles (qui, quoi, combien, quand, conditions
-d'annulation) + le hash des termes figés + la **signature ERC-1271** du Safe.
+d'annulation), épinglé sur IPFS. Son hash `keccak256(terms)` sert de **salt** à la
+délégation → la signature de l'abonné **commit on-chain au hash exact des termes**.
 Voir `subscription-agreement.example.json`.
 
 ---
 
-## ⚠️ Pourquoi le Safe Allowance Module (et pas les caveats ERC-7710)
+## ⚠️ Pourquoi un smart account (et pas un EOA pur ni un Safe)
 
-Le MetaMask Delegation Toolkit attend un delegator « DeleGator » (signature EOA
-ECDSA). Un **Safe signe en ERC-1271** (signatures owners collectées) → pas
-compatible out of the box. Le **Safe Allowance Module** est le primitif natif,
-audité, qui fait exactement « allowance + reset périodique + pull par un delegate ».
+Dans le Delegation Toolkit, le **delegator doit être un smart account** : un EOA
+pur ne peut pas porter de caveats, et un **Safe** signe en ERC-1271 alors que le
+toolkit attend une signature **ECDSA d'un DeleGator**. Le **Hybrid DeleGator** est
+le primitif natif : déployé par un EOA, il détient les tokens et porte le caveat.
 
 ---
 
@@ -35,86 +45,62 @@ audité, qui fait exactement « allowance + reset périodique + pull par un dele
 
 **Env**
 - Node ≥ 20 + bun
-- Sepolia, RPC (Alchemy/Infura), faucet ETH + un ERC20 de test
-- Un Safe de test déployé sur Sepolia (app.safe.global ou Safe SDK), ≥ 1 owner contrôlé
+- Sepolia, RPC (Alchemy/Infura), faucet ETH
+- (optionnel) un compte Pinata pour épingler le JSON sur IPFS
+- (optionnel) une URL de bundler ERC-4337 pour la révocation
 
-**Module**
-- Safe Allowance Module (adresse Sepolia à mettre dans le README)
-- `addDelegate`, `setAllowance(delegate, token, amount, resetTimeMin, resetBaseMin)`,
-  `executeAllowanceTransfer`, `removeAllowance`, `removeDelegate`
+**Delegation Framework (Sepolia, v1.3.0)** — résolu via `getSmartAccountsEnvironment(sepolia.id)` :
+- DelegationManager : `0xdb9B1e94B5b69Df7e401DDbedE43491141047dB3`
+- EntryPoint : `0x0000000071727De22E5E9d8BAf0edAc6f37da032`
 
 **Libs**
 | Lib | Rôle |
 |---|---|
-| `@safe-global/protocol-kit` | activer le module, signer/exécuter (ERC-1271, multi-owner) |
-| `@safe-global/api-kit` | proposer/collecter les signatures owners |
-| `viem` | RPC, encodage, lecture allowances |
+| `@metamask/smart-accounts-kit` | smart account DeleGator, `createDelegation`, caveats, `DelegationManager`, redeem |
+| `viem` | RPC, encodage ERC20, lecture du montant disponible |
 | `react` + `vite` + `wagmi` | front |
+| Foundry | MockERC20 + déploiement |
 
 **À savoir**
-- Le Safe signe en ERC-1271 via le Protocol Kit (pas de signature EOA directe)
-- `resetTimeMin` en minutes : 43200 ≈ 30 jours
-- Le delegate qui prélève peut être un EOA simple
+- L'abonné signe la délégation **en ECDSA via le smart account** (`signDelegation`).
+- `periodDuration` en **secondes** : 2592000 ≈ 30 jours.
+- Le delegate qui prélève peut être un **EOA simple** (tx directe, sans bundler).
+- Le smart account doit être **déployé** (appel factory direct) et **financé en tokens**
+  pour que le prélèvement passe ; il ne lui faut de l'ETH que pour révoquer (user op).
 
 ---
 
-## Architecture cible
+## Architecture (implémentée)
 
 ```
 safe-subscriptions/
-├── subscription-agreement.example.json   # termes du contrat orga <-> abonné
+├── subscription-agreement.example.json   # termes orga <-> abonné (format délégation + IPFS)
+├── contracts/                            # Foundry
+│   ├── src/MockERC20.sol                 # ERC20 mintable de test
+│   └── script/Deploy.s.sol
 ├── packages/
-│   ├── core/
-│   │   ├── enableModule.ts          # active l'Allowance Module sur le Safe
-│   │   ├── createSubscription.ts    # addDelegate + setAllowance, build le JSON
-│   │   ├── signAndExecute.ts        # Protocol Kit : propose -> collecte -> exécute
-│   │   ├── charge.ts                # executeAllowanceTransfer (prélèvement du mois)
-│   │   └── storage.ts               # persiste les JSON d'accord
-│   └── web/                         # React: créer / lister / révoquer
-└── scripts/
-    └── charge.ts                    # cron du service : prélève les abonnements dus
+│   ├── core/src/                         # logique runtime-agnostique (TypeScript)
+│   │   ├── chain.ts                      # clients viem + getEnvironment(sepolia)
+│   │   ├── smartAccount.ts               # createSubscriberSmartAccount + deploySmartAccount
+│   │   ├── terms.ts                      # termes + keccak256(terms) canonique
+│   │   ├── ipfs.ts                       # pin Pinata (+ pinner offline pour tests)
+│   │   ├── createSubscription.ts         # createDelegation(erc20PeriodTransfer) + sign
+│   │   ├── charge.ts                     # redeemDelegations + lecture montant dispo
+│   │   ├── revoke.ts                     # disableDelegation via bundler
+│   │   └── storage.ts                    # persistance JSON des délégations signées
+│   └── web/                              # React + wagmi : connecter / créer / lister / révoquer
+└── scripts/                             # CLI: create.ts (abonné), charge.ts (orga cron), revoke.ts
 ```
 
 ---
 
-## Prompt à coller dans une session Claude Code (dossier safe-subscriptions/)
+## Flow de bout en bout (Sepolia)
 
-```text
-Construis "safe-subscriptions" : abonnements crypto récurrents où un Gnosis Safe
-autorise une organisation à prélever un montant ERC20 fixe chaque mois, via le
-Safe Allowance Module. Le fichier subscription-agreement.example.json (déjà présent)
-définit le format du contrat orga<->abonné : respecte-le.
+1. `forge script Deploy` → déployer MockERC20, mettre l'adresse dans `.env`.
+2. `bun scripts/create.ts 10` → déploie le smart account, mint des tokens, crée +
+   signe la délégation (10/période), épingle les termes, persiste.
+3. `bun scripts/charge.ts` → l'orga prélève la période en cours.
+4. Rejouer `charge` immédiatement → **no-op** (période déjà prélevée, le caveat refuse).
+5. `bun scripts/revoke.ts <id>` → `disableDelegation` ; tout `charge` suivant échoue.
 
-OBJECTIF
-Les owners du Safe signent UNE fois (activation module + setAllowance). Grâce à
-l'allowance avec reset mensuel (le "caveat"), l'organisation prélève le montant dû
-tous les 30 jours, plafonné par le module. Révocation via removeAllowance.
-
-STACK
-- bun + TypeScript + Vite + React + wagmi
-- @safe-global/protocol-kit, @safe-global/api-kit, viem
-- Réseau: Sepolia. RPC: Alchemy. Safe de test déjà déployé.
-
-LIVRABLES
-1. packages/core :
-   - enableModule(safe)
-   - createSubscription(delegate, token, monthlyAmount) -> addDelegate +
-     setAllowance(amount, resetTimeMin=43200) ; génère le JSON d'accord conforme
-     à subscription-agreement.example.json (avec agreedTermsHash = keccak256(terms)).
-   - signAndExecute() via Protocol Kit (ERC-1271 + collecte signatures owners)
-   - charge(subscription) -> executeAllowanceTransfer
-   - storage.ts (localStorage pour le POC)
-2. packages/web : connexion + sélection Safe ; formulaire créer un abonnement ;
-   liste (allowance restante, prochain reset, révoquer) ; affichage/export du JSON.
-3. scripts/charge.ts : cron du service.
-4. README : .env (RPC_URL, SAFE_ADDRESS, OWNER_PRIVATE_KEY de test), adresse module,
-   ERC20 mock + financement du Safe.
-
-CONTRAINTES
-- États loading/error/empty. Adresses en lowercase. Jamais de clé privée committée.
-- Le Safe signe en ERC-1271 via le Protocol Kit.
-- Plan détaillé d'abord, puis implémente et vérifie le flow
-  enableModule -> setAllowance -> charge sur Sepolia.
-
-Lis la doc Safe Modules + Allowance Module + Protocol Kit, puis propose le plan.
-```
+Voir `README.md` pour les détails `.env` et la vérification.

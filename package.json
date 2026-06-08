@@ -14,8 +14,16 @@
     "charge": "bun run scripts/charge.ts",
     "web": "bun run --filter @safe-subscriptions/web dev"
   },
+  "dependencies": {
+    "@metamask/smart-accounts-kit": "^1.6.0",
+    "@safe-subscriptions/core": "workspace:*",
+    "viem": "2.52.2"
+  },
   "devDependencies": {
     "@types/node": "^25.9.2",
     "typescript": "^6.0.3"
+  },
+  "overrides": {
+    "viem": "2.52.2"
   }
 }

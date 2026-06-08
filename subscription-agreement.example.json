@@ -1,60 +1,33 @@
 {
-  "$schema": "./subscription-agreement.schema.json",
-  "agreement": {
-    "id": "sub_2026_acme_max_001",
-    "version": "1.0.0",
-    "title": "Abonnement mensuel ACME Pro",
-    "createdAt": "2026-06-08T00:00:00Z",
-    "status": "active"
-  },
-
-  "organization": {
-    "name": "ACME Org",
-    "legalEntity": "ACME SAS",
-    "delegate": "0x0000000000000000000000000000000000000000",
-    "comment": "delegate = adresse qui appelle executeAllowanceTransfer pour encaisser"
-  },
-
-  "subscriber": {
-    "label": "Max",
-    "safe": "0x0000000000000000000000000000000000000000",
-    "comment": "safe = le Gnosis Safe qui signe et depuis lequel on preleve"
-  },
-
+  "schema": "safe-subscriptions/agreement@1",
+  "id": "sub_1749340800_a1b2c3d4",
+  "createdAt": "2026-06-08T00:00:00Z",
+  "chainId": 11155111,
+  "termsHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "_comment_termsHash": "keccak256 des termes canonicalisés — sert aussi de salt à la délégation, donc la signature de l'abonné commit au hash exact des termes.",
   "terms": {
+    "organization": {
+      "name": "ACME Org",
+      "delegate": "0x0000000000000000000000000000000000000000",
+      "recipient": "0x0000000000000000000000000000000000000000",
+      "_comment": "delegate = EOA qui appelle redeemDelegations ; recipient = qui reçoit les tokens prélevés"
+    },
+    "subscriber": {
+      "label": "POC subscriber",
+      "smartAccount": "0x0000000000000000000000000000000000000000",
+      "owner": "0x0000000000000000000000000000000000000000",
+      "_comment": "smartAccount = le DeleGator (delegator) ; owner = l'EOA qui le contrôle et signe en ECDSA"
+    },
     "token": {
-      "symbol": "USDC",
       "address": "0x0000000000000000000000000000000000000000",
+      "symbol": "subUSD",
       "decimals": 6
     },
-    "amountPerPeriod": "10.00",
+    "amountPerPeriod": "10",
     "amountPerPeriodRaw": "10000000",
-    "period": "monthly",
-    "periodResetMinutes": 43200,
-    "billing": {
-      "startDate": "2026-06-08T00:00:00Z",
-      "endDate": null,
-      "trialDays": 0,
-      "autoRenew": true
-    },
-    "cancellation": {
-      "policy": "anytime",
-      "comment": "revocation = removeAllowance / removeDelegate sur le module"
-    }
-  },
-
-  "onchain": {
-    "chainId": 11155111,
-    "chainName": "sepolia",
-    "allowanceModule": "0x0000000000000000000000000000000000000000",
-    "comment": "le caveat est porte par setAllowance(delegate, token, amount, resetTimeMin)"
-  },
-
-  "consent": {
-    "agreedTermsHash": "0x",
-    "comment": "keccak256 du bloc 'terms' fige les conditions acceptees",
-    "safeSignature": "0x",
-    "signatureType": "ERC-1271",
-    "signedAt": null
+    "periodSeconds": 2592000,
+    "startDate": 1749340800,
+    "endDate": null,
+    "cancellation": "Annulable à tout moment par le subscriber via disableDelegation."
   }
 }
