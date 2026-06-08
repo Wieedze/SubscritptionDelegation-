@@ -1,35 +1,30 @@
-import type { SubscriptionRecord, SubscriptionStore } from "@safe-subscriptions/core";
+/** A subscription created through the gasless 1Shot flow (stored locally). */
+export interface RelayedSubscription {
+  id: string;
+  createdAt: string;
+  amount: string; // human USDC per period
+  periodDays: number;
+  recipient: string;
+  taskId: string;
+  txHash?: string;
+}
 
-const KEY = "safe-subscriptions/records";
+const KEY = "safe-subscriptions/relayed";
 
-function read(): SubscriptionRecord[] {
+export function listSubscriptions(): RelayedSubscription[] {
   try {
-    return JSON.parse(localStorage.getItem(KEY) ?? "[]") as SubscriptionRecord[];
+    return JSON.parse(localStorage.getItem(KEY) ?? "[]") as RelayedSubscription[];
   } catch {
     return [];
   }
 }
 
-function write(records: SubscriptionRecord[]): void {
-  localStorage.setItem(KEY, JSON.stringify(records));
+export function saveSubscription(sub: RelayedSubscription): void {
+  const all = listSubscriptions();
+  all.unshift(sub);
+  localStorage.setItem(KEY, JSON.stringify(all));
 }
 
-/** localStorage-backed subscription store for the browser. */
-export const localStore: SubscriptionStore = {
-  async all() {
-    return read();
-  },
-  async get(id) {
-    return read().find((r) => r.id === id);
-  },
-  async save(record) {
-    const records = read();
-    const idx = records.findIndex((r) => r.id === record.id);
-    if (idx >= 0) records[idx] = record;
-    else records.push(record);
-    write(records);
-  },
-  async remove(id) {
-    write(read().filter((r) => r.id !== id));
-  },
-};
+export function removeSubscription(id: string): void {
+  localStorage.setItem(KEY, JSON.stringify(listSubscriptions().filter((s) => s.id !== id)));
+}
