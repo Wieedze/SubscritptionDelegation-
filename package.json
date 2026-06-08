@@ -1,0 +1,21 @@
+{
+  "name": "safe-subscriptions",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "typecheck": "bun run --filter '*' typecheck",
+    "charge": "bun run scripts/charge.ts",
+    "web": "bun run --filter @safe-subscriptions/web dev"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.2",
+    "typescript": "^6.0.3"
+  }
+}
