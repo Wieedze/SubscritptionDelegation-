@@ -89,6 +89,7 @@ async function main() {
     environment: env,
     chainId: client.chain!.id,
     subscriberSmartAccount: smartAccount,
+    subscriberOwner: subscriberAccount.address,
     organization: {
       name: "ACME Org",
       delegate: orgAccount.address,

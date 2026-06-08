@@ -16,6 +16,8 @@ export interface CreateSubscriptionParams {
   chainId: number;
   /** The subscriber's DeleGator smart account (delegator). */
   subscriberSmartAccount: MetaMaskSmartAccount;
+  /** The EOA that owns/controls the smart account and signs for it. */
+  subscriberOwner: Address;
   organization: { name: string; delegate: Address; recipient: Address };
   subscriberLabel: string;
   token: { address: Address; symbol: string; decimals: number };
@@ -40,14 +42,14 @@ export async function createSubscription(
 ): Promise<SubscriptionRecord> {
   const periodSeconds = params.periodSeconds ?? MONTHLY_SECONDS;
   const startDate = params.startDate ?? Math.floor(Date.now() / 1000);
-  const owner = params.subscriberSmartAccount;
+  const smartAccount = params.subscriberSmartAccount;
 
   const terms = buildTerms({
     organization: params.organization,
     subscriber: {
       label: params.subscriberLabel,
-      smartAccount: owner.address,
-      owner: owner.address,
+      smartAccount: smartAccount.address,
+      owner: params.subscriberOwner,
     },
     token: params.token,
     amountPerPeriod: params.amountPerPeriod,
@@ -57,7 +59,7 @@ export async function createSubscription(
     cancellation: params.cancellation,
   });
 
-  const id = `sub_${startDate}_${owner.address.slice(2, 10).toLowerCase()}`;
+  const id = `sub_${startDate}_${smartAccount.address.slice(2, 10).toLowerCase()}`;
   const agreement = buildAgreementDocument({ id, chainId: params.chainId, terms });
   const pinned = await params.pin(agreement);
 
@@ -75,7 +77,7 @@ export async function createSubscription(
 
   const unsigned: Delegation = createDelegation({
     environment: params.environment,
-    from: owner.address,
+    from: smartAccount.address,
     to: params.organization.delegate,
     // Bind the signature to the exact terms.
     salt: agreement.termsHash,
@@ -89,7 +91,7 @@ export async function createSubscription(
     ...(extraCaveats ? { caveats: extraCaveats } : {}),
   });
 
-  const signature = await owner.signDelegation({ delegation: unsigned });
+  const signature = await smartAccount.signDelegation({ delegation: unsigned });
   const delegation: Delegation = { ...unsigned, signature };
 
   return {

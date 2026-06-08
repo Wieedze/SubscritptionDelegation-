@@ -79,6 +79,7 @@ export function App() {
           environment: getEnvironment(),
           chainId: sepolia.id,
           subscriberSmartAccount: smartAccount,
+          subscriberOwner: walletClient.account.address,
           organization: {
             name: values.orgName || "Organization",
             delegate: getAddress(values.delegate) as Address,
