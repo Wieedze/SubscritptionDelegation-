@@ -6,4 +6,5 @@ export * from "./ipfs.js";
 export * from "./createSubscription.js";
 export * from "./charge.js";
 export * from "./revoke.js";
+export * from "./relayer.js";
 export * from "./storage.js";
