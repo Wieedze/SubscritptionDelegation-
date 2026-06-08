@@ -32,10 +32,48 @@ export async function revokeSubscription(params: {
     transport: http(params.bundlerUrl),
   });
 
+  // Bundlers (e.g. Pimlico) enforce their own min gas price; viem's default
+  // (chain priority fee) is too low. Fetch the bundler's recommended price.
+  const fees = await getBundlerGasPrice(params.bundlerUrl);
+
   const userOpHash = await bundler.sendUserOperation({
     calls: [{ to: params.environment.DelegationManager, data: disableCalldata }],
+    ...fees,
   });
 
   const receipt = await bundler.waitForUserOperationReceipt({ hash: userOpHash });
   return receipt.receipt.transactionHash;
+}
+
+/**
+ * Ask the bundler for its recommended user-operation gas price. Supports the
+ * Pimlico `pimlico_getUserOperationGasPrice` extension; falls back to undefined
+ * fees (viem default) on any other bundler.
+ */
+async function getBundlerGasPrice(
+  bundlerUrl: string,
+): Promise<{ maxFeePerGas?: bigint; maxPriorityFeePerGas?: bigint }> {
+  try {
+    const res = await fetch(bundlerUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "pimlico_getUserOperationGasPrice",
+        params: [],
+      }),
+    });
+    const json = (await res.json()) as {
+      result?: { fast?: { maxFeePerGas: string; maxPriorityFeePerGas: string } };
+    };
+    const fast = json.result?.fast;
+    if (!fast) return {};
+    return {
+      maxFeePerGas: BigInt(fast.maxFeePerGas),
+      maxPriorityFeePerGas: BigInt(fast.maxPriorityFeePerGas),
+    };
+  } catch {
+    return {};
+  }
 }
