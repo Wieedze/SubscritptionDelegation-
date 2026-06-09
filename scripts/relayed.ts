@@ -44,7 +44,8 @@ async function main() {
   const relayerUrl = relayerUrlForChain(CHAIN_ID);
 
   const subscriber = privateKeyToAccount(config.subscriberKey);
-  const recipient = config.orgRecipient;
+  // Recipient (the "org") — pass an address as the first arg, else ORG_RECIPIENT.
+  const recipient = process.argv[2] ? getAddress(process.argv[2]) : config.orgRecipient;
 
   // 1. Relayer capabilities: accepted fee token (USDC), targetAddress, feeCollector.
   const caps = await getCapabilities(relayerUrl, CHAIN_ID);
