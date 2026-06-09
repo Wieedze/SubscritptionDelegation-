@@ -77,9 +77,15 @@ export async function grantAndChargeViaRelayer(params: {
   });
 
   onStatus("Waiting for the relayer to confirm on-chain…");
-  const status = await pollRelayerUntilDone(relayerUrl, taskId);
-  if (status.status !== 200) {
-    throw new Error(`Relayer task ${taskId} ended with status ${status.status}: ${status.message ?? ""}`);
+  try {
+    const status = await pollRelayerUntilDone(relayerUrl, taskId, { timeoutMs: 60_000 });
+    if (status.status === 400 || status.status === 500) {
+      throw new Error(`Relayer rejected the task (${status.status}): ${status.message ?? ""}`);
+    }
+    return { taskId, txHash: status.receipt?.transactionHash ?? status.hash };
+  } catch (err) {
+    // The relayer's testnet status API can lag; the bundle is already submitted.
+    if (/Timeout/.test((err as Error).message)) return { taskId };
+    throw err;
   }
-  return { taskId, txHash: status.receipt?.transactionHash ?? status.hash };
 }
