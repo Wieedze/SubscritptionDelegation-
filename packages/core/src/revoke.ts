@@ -1,6 +1,7 @@
 import { http, type Hex, type PublicClient } from "viem";
 import { createBundlerClient } from "viem/account-abstraction";
 import type {
+  Delegation,
   MetaMaskSmartAccount,
   SmartAccountsEnvironment,
 } from "@metamask/smart-accounts-kit";
@@ -8,22 +9,23 @@ import { DelegationManager } from "@metamask/smart-accounts-kit/contracts";
 import type { SubscriptionRecord } from "./types.js";
 
 /**
- * Revoke a subscription on-chain. `disableDelegation` must be called BY the
+ * Revoke a delegation on-chain. `disableDelegation` must be called BY the
  * delegator (the smart account), so this is sent as an ERC-4337 user operation
- * through a bundler. The smart account must be deployed and hold a little ETH to
- * pay for the user operation (or use a paymaster — out of scope for this POC).
+ * through a bundler. The smart account must be deployed and hold a little native
+ * gas to pay for the user operation (negligible on an L2). After this, any
+ * redemption of the delegation reverts with `CannotUseADisabledDelegation`.
  *
  * Returns the transaction hash that included the user operation.
  */
-export async function revokeSubscription(params: {
+export async function revokeDelegation(params: {
   client: PublicClient;
   subscriberSmartAccount: MetaMaskSmartAccount;
   environment: SmartAccountsEnvironment;
   bundlerUrl: string;
-  record: SubscriptionRecord;
+  delegation: Delegation;
 }): Promise<Hex> {
   const disableCalldata = DelegationManager.encode.disableDelegation({
-    delegation: params.record.delegation,
+    delegation: params.delegation,
   });
 
   const bundler = createBundlerClient({
@@ -43,6 +45,17 @@ export async function revokeSubscription(params: {
 
   const receipt = await bundler.waitForUserOperationReceipt({ hash: userOpHash });
   return receipt.receipt.transactionHash;
+}
+
+/** Convenience wrapper for the CLI {@link SubscriptionRecord}. */
+export async function revokeSubscription(params: {
+  client: PublicClient;
+  subscriberSmartAccount: MetaMaskSmartAccount;
+  environment: SmartAccountsEnvironment;
+  bundlerUrl: string;
+  record: SubscriptionRecord;
+}): Promise<Hex> {
+  return revokeDelegation({ ...params, delegation: params.record.delegation });
 }
 
 /**

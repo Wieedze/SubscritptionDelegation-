@@ -1,21 +1,68 @@
 import { useCallback, useEffect, useState } from "react";
-import { useAccount, useConnect, useDisconnect } from "wagmi";
+import {
+  useAccount,
+  useConnect,
+  useDisconnect,
+  usePublicClient,
+  useWalletClient,
+} from "wagmi";
 import { baseSepolia } from "wagmi/chains";
+import {
+  type Account,
+  type Chain,
+  type PublicClient,
+  type Transport,
+  type WalletClient,
+} from "viem";
 import { ipfsToHttp } from "@safe-subscriptions/core";
 import { Subscribe } from "./Subscribe.js";
 import { listSubscriptions, removeSubscription, type RelayedSubscription } from "./store.js";
+import { canRevoke, revokeSubscriptionOnChain } from "./revoke.js";
 import { shortAddr } from "./lib.js";
 
 export function App() {
   const { address, isConnected, chainId } = useAccount();
   const { connectors, connect, isPending } = useConnect();
   const { disconnect } = useDisconnect();
+  const { data: walletClient } = useWalletClient();
+  const publicClient = usePublicClient();
   const [subs, setSubs] = useState<RelayedSubscription[]>([]);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(() => setSubs(listSubscriptions()), []);
   useEffect(refresh, [refresh]);
 
   const wrongChain = isConnected && chainId !== baseSepolia.id;
+
+  async function revoke(s: RelayedSubscription) {
+    setError(null);
+    if (!s.delegation) return;
+    if (!walletClient || !publicClient) {
+      setError("Wallet not ready.");
+      return;
+    }
+    setBusyId(s.id);
+    try {
+      const wc = walletClient as unknown as WalletClient<Transport, Chain, Account>;
+      const pc = publicClient as unknown as PublicClient;
+      const txHash = await revokeSubscriptionOnChain({
+        walletClient: wc,
+        publicClient: pc,
+        delegation: s.delegation,
+        onStatus: setStatus,
+      });
+      console.info("revoked, tx:", txHash);
+      removeSubscription(s.id);
+      refresh();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusyId(null);
+      setStatus(null);
+    }
+  }
 
   return (
     <main className="app">
@@ -53,6 +100,8 @@ export function App() {
 
       <section className="card">
         <h2>Subscriptions</h2>
+        {status && <p className="busy">{status}</p>}
+        {error && <p className="error">{error}</p>}
         {subs.length === 0 ? (
           <p className="muted">No subscriptions yet.</p>
         ) : (
@@ -60,11 +109,11 @@ export function App() {
             {subs.map((s) => (
               <li key={s.id} className="list__item">
                 <div className="list__main">
-                  <strong>
-                    {s.amount} USDC
-                  </strong>{" "}
-                  every {s.periodDays} days
-                  <div className="muted small">to {shortAddr(s.recipient)}</div>
+                  <strong>{s.amount} USDC</strong> every {s.periodDays} days
+                  <div className="muted small">
+                    to {shortAddr(s.recipient)}
+                    {s.smartAccount && <> · from {shortAddr(s.smartAccount)}</>}
+                  </div>
                   {s.agreement && (
                     <div className="muted small">
                       contract:{" "}
@@ -96,15 +145,28 @@ export function App() {
                     </div>
                   )}
                 </div>
-                <button
-                  className="danger"
-                  onClick={() => {
-                    removeSubscription(s.id);
-                    refresh();
-                  }}
-                >
-                  Remove
-                </button>
+                {s.delegation && canRevoke ? (
+                  <button
+                    className="danger"
+                    disabled={busyId != null}
+                    title="Disable the delegation on-chain — the org can no longer charge"
+                    onClick={() => revoke(s)}
+                  >
+                    {busyId === s.id ? "Revoking…" : "Revoke"}
+                  </button>
+                ) : (
+                  <button
+                    className="danger"
+                    disabled={busyId != null}
+                    title="Remove from this list (no on-chain effect)"
+                    onClick={() => {
+                      removeSubscription(s.id);
+                      refresh();
+                    }}
+                  >
+                    Remove
+                  </button>
+                )}
               </li>
             ))}
           </ul>

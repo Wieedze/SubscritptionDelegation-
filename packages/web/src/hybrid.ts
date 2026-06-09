@@ -18,6 +18,7 @@ import {
   relayerUrlForChain,
   signRelayerSubscriptionDelegation,
   MONTHLY_SECONDS,
+  type Delegation,
 } from "@safe-subscriptions/core";
 import { buildAndPinAgreement } from "./agreement.js";
 
@@ -44,6 +45,7 @@ export async function subscribeHybridViaRelayer(params: {
   txHash?: string;
   smartAccount: Address;
   agreement: { cid: string; uri: string; termsHash: Hex };
+  delegation: Delegation;
 }> {
   const { onStatus = () => {}, publicClient, walletClient } = params;
   const relayerUrl = relayerUrlForChain(params.chainId);
@@ -146,10 +148,11 @@ export async function subscribeHybridViaRelayer(params: {
       txHash: status.receipt?.transactionHash ?? status.hash,
       smartAccount: smartAccount.address,
       agreement,
+      delegation: signedDelegation,
     };
   } catch (err) {
     if (/Timeout/.test((err as Error).message)) {
-      return { taskId, smartAccount: smartAccount.address, agreement };
+      return { taskId, smartAccount: smartAccount.address, agreement, delegation: signedDelegation };
     }
     throw err;
   }

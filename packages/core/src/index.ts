@@ -1,3 +1,4 @@
+export type { Delegation } from "@metamask/smart-accounts-kit";
 export * from "./types.js";
 export * from "./chain.js";
 export * from "./smartAccount.js";

@@ -1,3 +1,5 @@
+import type { Delegation } from "@safe-subscriptions/core";
+
 /** A subscription created through the gasless 1Shot flow (stored locally). */
 export interface RelayedSubscription {
   id: string;
@@ -9,6 +11,10 @@ export interface RelayedSubscription {
   txHash?: string;
   /** Human-readable contract pinned to IPFS, hash bound to the signature. */
   agreement?: { cid: string; uri: string; termsHash: string };
+  /** The subscriber's smart account (delegator) — needed to revoke. */
+  smartAccount?: string;
+  /** The signed delegation — needed to revoke on-chain (disableDelegation). */
+  delegation?: Delegation;
 }
 
 const KEY = "safe-subscriptions/relayed";

@@ -66,10 +66,15 @@ export function Subscribe(props: { onCreated: () => void }) {
         recipient: resolvedRecipient,
         taskId: result.taskId,
         txHash: result.txHash,
-        // Only the hybrid flow binds + pins a contract; ERC-7715 has none.
+        // Only the hybrid flow binds a contract + a revocable delegation.
         agreement:
           "agreement" in result
             ? (result.agreement as RelayedSubscription["agreement"])
+            : undefined,
+        smartAccount: "smartAccount" in result ? (result.smartAccount as string) : undefined,
+        delegation:
+          "delegation" in result
+            ? (result.delegation as RelayedSubscription["delegation"])
             : undefined,
       });
       setStatus(null);
