@@ -36,17 +36,27 @@ type JsonRpc<T> =
   | { jsonrpc: "2.0"; id: number | string; result: T }
   | { jsonrpc: "2.0"; id: number | string; error: { code: number; message: string; data?: unknown } };
 
+/** The relayer occasionally returns a transient internal error; retry those. */
+function isTransientRelayerError(err: { code: number; message: string; data?: unknown }): boolean {
+  const code = (err.data as { errorCode?: string } | undefined)?.errorCode;
+  return code === "ERR_ONESHOT" || /Not Found/i.test(err.message);
+}
+
 async function rpc<T>(url: string, method: string, params: unknown, id = 1): Promise<T> {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
-  });
-  const json = (await res.json()) as JsonRpc<T>;
-  if ("error" in json) {
-    throw new Error(`relayer [${json.error.code}] ${json.error.message}`);
+  let lastError: { code: number; message: string; data?: unknown } | undefined;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 2000 * attempt));
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
+    });
+    const json = (await res.json()) as JsonRpc<T>;
+    if (!("error" in json)) return json.result;
+    lastError = json.error;
+    if (!isTransientRelayerError(json.error)) break;
   }
-  return json.result;
+  throw new Error(`relayer [${lastError?.code}] ${lastError?.message}`);
 }
 
 /** Convert delegation bigints / Uint8Arrays into JSON-safe shapes for the relayer. */

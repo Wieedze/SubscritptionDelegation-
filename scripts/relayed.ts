@@ -65,11 +65,13 @@ async function main() {
     args: [subscriber.address],
   });
   const workAmount = parseUnits("0.1", token.decimals); // 0.1 USDC / period
-  // Cap = subscription amount + generous fee headroom (the first charge also pays
-  // the one-time EIP-7702 upgrade gas, billed in USDC by the relayer).
-  const periodAmount = parseUnits("5", token.decimals);
+  // Cap = subscription amount + generous fee headroom. On Sepolia the relayer fee
+  // is gas-priced in USDC and can spike to several USDC, plus the one-time 7702
+  // upgrade on the first charge — keep the cap well above that.
+  const periodAmount = parseUnits("15", token.decimals);
+  const ethBefore = await client.getBalance({ address: subscriber.address });
   console.log("USDC balance       :", formatUnits(usdcBalance, token.decimals), "USDC");
-  if (usdcBalance < workAmount + parseUnits("1", token.decimals)) {
+  if (usdcBalance < parseUnits("7", token.decimals)) {
     throw new Error(
       `Subscriber needs Sepolia USDC. Fund ${subscriber.address} via https://faucet.circle.com`,
     );
@@ -107,14 +109,43 @@ async function main() {
   });
   console.log("Submitted to relayer. taskId:", taskId);
 
-  const status = await pollRelayerUntilDone(relayerUrl, taskId);
-  if (status.status === 200) {
-    console.log(`\n✅ Charged 0.1 USDC via 1Shot (gas-abstracted, no ETH spent).`);
-    console.log("  tx:", status.receipt?.transactionHash ?? status.hash);
-  } else {
-    console.error(`\n✗ Relayer task ended with status ${status.status}:`, status.message ?? status.data);
+  // 6. Confirm. The relayer status API can lag on testnet, so fall back to the
+  //    on-chain effect (USDC spent on fee) as the source of truth.
+  let txHash: string | undefined;
+  try {
+    const status = await pollRelayerUntilDone(relayerUrl, taskId, { timeoutMs: 60_000 });
+    if (status.status === 200) txHash = status.receipt?.transactionHash ?? status.hash;
+    else if (status.status === 400 || status.status === 500) {
+      throw new Error(`Relayer rejected the task (${status.status}): ${status.message ?? JSON.stringify(status.data)}`);
+    }
+  } catch (err) {
+    if (!/Timeout/.test((err as Error).message)) throw err;
+    console.log("Relayer status API is lagging — confirming on-chain instead…");
+  }
+
+  const usdcAfter = await client.readContract({
+    address: token.address,
+    abi: ERC20_BALANCE_ABI,
+    functionName: "balanceOf",
+    args: [subscriber.address],
+  });
+  const ethAfter = await client.getBalance({ address: subscriber.address });
+  const usdcSpent = usdcBalance - usdcAfter;
+
+  if (usdcSpent <= 0n) {
+    console.error("\n✗ Charge not yet visible on-chain. Re-check the task shortly.");
     process.exit(1);
   }
+
+  console.log(`\n✅ Charged via 1Shot — gas-abstracted, no ETH spent.`);
+  console.log(
+    "  fee paid (USDC)  :",
+    formatUnits(usdcSpent, token.decimals),
+    authorization ? "(relayer gas + one-time 7702 upgrade, priced in USDC)" : "(relayer gas, priced in USDC)",
+  );
+  console.log("  ETH spent        :", formatUnits(ethBefore - ethAfter, 18), "(0 = relayer paid the gas)");
+  if (txHash) console.log("  tx               :", txHash);
+  console.log("  explorer         : https://sepolia.etherscan.io/address/" + subscriber.address);
 }
 
 main().catch((err) => {

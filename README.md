@@ -96,6 +96,44 @@ bundler + a little ETH in the smart account). Afterwards any `charge` reverts wi
 bun run --filter @safe-subscriptions/web dev
 ```
 
+## Gasless mode — 1Shot relayer + ERC-7715 (no ETH)
+
+A second, fully gas-abstracted flow: the subscriber never needs ETH. The relayer
+fee and the subscription are both paid in **USDC**, and the [1Shot public
+relayer](https://1shotapi.com) covers gas via EIP-7710 delegated execution.
+
+- The subscriber is an **EIP-7702** smart account (its address *is* the EOA — no deploy).
+- One period delegation (USDC) is signed to the relayer's `targetAddress`.
+- Each charge submits a bundle `[fee → feeCollector, amount → org]`; 1Shot redeems
+  it and is paid in USDC. **No ETH, no bundler, no paymaster.**
+
+### CLI
+
+```bash
+# Fund the subscriber EOA with Sepolia USDC (https://faucet.circle.com), then:
+bun scripts/relayed.ts
+```
+
+The first charge also pays the one-time EIP-7702 upgrade (billed in USDC). The
+relayer's testnet status API can lag, so the script confirms the charge on-chain
+(USDC spent on fee, ETH unchanged).
+
+> Verified on Sepolia: EOA upgraded to 7702, USDC fee paid, subscription transfer
+> executed, **ETH balance unchanged** — fully gasless.
+
+### Web (Advanced Permissions, ERC-7715)
+
+The web app (`packages/web`) implements the most MetaMask-native path: the user
+approves a recurring `erc20-token-periodic` permission **directly in MetaMask**
+(ERC-7715), and the first period is charged gaslessly through the 1Shot relayer.
+
+- Set `VITE_RPC_URL` in `packages/web/.env.local`.
+- Requires a wallet that supports ERC-7715 (**MetaMask ≥13.23 or Flask ≥13.5**).
+
+```bash
+bun run --filter @safe-subscriptions/web dev
+```
+
 ## How the on-chain binding works
 
 - The subscription cap is the **`erc20PeriodTransfer`** caveat synthesized from the
@@ -111,3 +149,10 @@ bun run --filter @safe-subscriptions/web dev
 - Storage is a local JSON file (CLI) / localStorage (web) — no backend.
 - Revocation requires a bundler; charging does not.
 - `MockERC20` is open-mint and **not** production-safe.
+- The 1Shot **testnet** relayer (`relayer.1shotapi.dev`) occasionally returns a
+  transient `ERR_ONESHOT` ("Not Found") on `estimate`/`send` — the relayer client
+  retries these with backoff. Its status API can also lag, so the CLI confirms the
+  charge on-chain (USDC spent on fee, ETH unchanged) rather than trusting the status.
+- On Sepolia the relayer fee is gas-priced **in USDC** and can spike to several USDC
+  (gas is high on testnet); on mainnet / L2 it is cents. The period cap is set well
+  above the fee + subscription amount to absorb this.
