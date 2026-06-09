@@ -10,8 +10,8 @@ IPFS** ; l'on-chain ne fait qu'appliquer le caveat (plafond par période).
 > ℹ️ **Pivot vs. première version.** Le design initial visait un Gnosis Safe + Safe
 > Allowance Module (parce qu'il supposait l'abonné = un Safe, qui signe en ERC-1271).
 > On a basculé sur le **MetaMask Delegation Toolkit** (ERC-7710/4337) : l'abonné est
-> un **smart account DeleGator contrôlé par un EOA** (signature ECDSA), ce qui est
-> mieux aligné avec ARP et donne un primitif d'abonnement natif (`erc20PeriodTransfer`).
+> un **smart account DeleGator contrôlé par un EOA** (signature ECDSA), qui donne un
+> primitif d'abonnement natif (`erc20PeriodTransfer`).
 
 ---
 

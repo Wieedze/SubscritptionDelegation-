@@ -1,19 +1,20 @@
 # Claude operating layer — safe-subscriptions
 
-Procedural knowledge, rules and review agents for this repo. Adapted from ARP,
-keeping only what's relevant to a MetaMask Delegation Toolkit project (Intuition /
-ModuleRegistry-specific material was dropped).
+Procedural knowledge, rules and review agents for this repo: a recurring-ERC20
+subscription POC built on the MetaMask Delegation Toolkit (ERC-7710 / 7702 / 7715)
+with gasless charging via the 1Shot relayer.
 
 ## skills/
 - `mms-smart-accounts-kit/` — MetaMask Smart Accounts Kit / Delegation Framework reference (ERC-4337, ERC-7710, ERC-7715, caveats). **Primary reference for this repo.**
 - `mms-gator-cli/` — gator CLI for init / grant / redeem / revoke delegations.
+- (`.agents/skills/public-relayer/` — the 1Shot relayer JSON-RPC API, used for gasless charges.)
 
 ## rules/
 - `00-INDEX.md` — routing table.
 - `code.md` — TS/JS standards (separation of concerns, no `any`, strict).
 - `solidity.md` — Solidity 0.8.24, NatSpec, custom errors (for `contracts/`).
 - `security.md` — threat-model checklist.
-- `metamask-delegation.md` — ERC-7710 delegation rules and patterns.
+- `metamask-delegation.md` — ERC-7710/7702/7715 delegation, the `erc20PeriodTransfer` caveat, the 1Shot relayer.
 - `ui.md` — typography-driven, dark-first UI discipline (for `packages/web`).
 - `workflow.md` — scope discipline, git hygiene, communication.
 

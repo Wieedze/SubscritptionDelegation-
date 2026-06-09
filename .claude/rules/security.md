@@ -1,6 +1,6 @@
 # Security rules
 
-Load for every task that touches a contract, an admin-callable function, or handling of value. ARP will eventually manage TRUST stakes — the MVP must already obey production-grade security discipline.
+Load for every task that touches a contract, an admin-callable function, or handling of value. This POC moves real ERC20 value under delegated authority — it must obey production-grade security discipline.
 
 ## Threat model checklist
 
@@ -26,12 +26,12 @@ Walk through each item for every contract change. Document the result (clean pas
 - Address parameters are checked for zero address where zero would be invalid.
 
 ### Front-running / MEV
-- Is the order of transactions observable + exploitable? Registration of a module is first-come-first-served on `id`, but the `creator` is bound to `msg.sender` — no front-runnable identity.
+- Is the order of transactions observable + exploitable? A subscription charge is bounded by the `erc20PeriodTransfer` caveat (a fixed cap per period), so reordering charges cannot extract more than the cap.
 - Any auction-like mechanic must be reviewed against the global `secure-workflow-guide` MEV section.
 
 ### Signature replay
-- If signatures are used (EIP-712, EIP-1271), they include a nonce + chainId + verifying contract.
-- The MVP does **not** use signatures. If a future task introduces them, this section must be revisited.
+- This project **does** use signatures: the subscription is an EIP-712 delegation signed by the subscriber. Replay protection comes from the Delegation Framework's EIP-712 domain (chainId + the `DelegationManager` as verifying contract) plus the delegation `salt`/nonce. The salt is `keccak256(terms)`, binding the signature to the exact pinned agreement.
+- Any new signed payload must include chainId + verifying contract + a nonce or unique salt. Never reuse a delegation signature across chains or across distinct terms.
 
 ### Oracles / external data
 - The MVP does not depend on oracles. If a future task introduces one, document the failure mode if the oracle is stale or wrong.
@@ -68,7 +68,7 @@ The `contract-reviewer` agent (in `.claude/agents/`) orchestrates these for you 
 
 ## Deployment posture
 
-- Default deployment target: **Intuition Testnet** (changed from Base Sepolia per `docs/00_HACKATHON_PIVOT.md`; ADR `0002`).
-- Mainnet deployment (Intuition mainnet or any other) requires explicit user confirmation per session and is out of scope for the hackathon submission.
-- Every deployment writes its addresses to `deployments/<chainId>.json`. Idempotent — re-running on the same chain does not redeploy unless `--force` is passed.
-- `.env.example` documents the Intuition Testnet RPC, explorer URL, and chain ID. Update it whenever a new env var is introduced.
+- Deployment targets: the **CLI / `packages/core` flows run on Sepolia**; the **web app runs on Base Sepolia**. Both are L2/testnets — never assume one chain for everything (see `chain.ts` for CLI/core, `wagmi.ts` for web).
+- Mainnet deployment of any kind requires explicit user confirmation per session and is out of scope for this POC.
+- The only deployable contract is `MockERC20`; paste its address into `TOKEN_ADDRESS` in `.env` after `forge script Deploy`. There is no `deployments/` registry.
+- `.env.example` documents the required RPC URLs, keys, and `TOKEN_ADDRESS`. Update it whenever a new env var is introduced.

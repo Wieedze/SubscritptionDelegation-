@@ -63,7 +63,7 @@ Every mutation of storage emits an event. No silent writes. Index the fields off
 
 ## External calls
 
-- No external calls in MVP `ModuleRegistry`. If a future module needs one, follow checks-effects-interactions strictly.
+- The only contract in this repo is `MockERC20` (an open-mint test token) plus its deploy script — no bespoke external calls. If a future contract needs one, follow checks-effects-interactions strictly.
 - Any external call to a non-trusted address must be reviewed via the Trail of Bits skill chain (`secure-workflow-guide` → `guidelines-advisor`).
 - Reentrancy guards (`nonReentrant`) only when there is an actual external call. Adding them defensively to functions with no external call is noise.
 
@@ -71,7 +71,7 @@ Every mutation of storage emits an event. No silent writes. Index the fields off
 
 - Loops over user-provided arrays are forbidden unless bounded by a constant.
 - View functions returning dynamic arrays must document the unbounded-growth risk in NatSpec.
-- Target: `registerModule` < 200k gas (see task spec). Measure with `forge test --gas-report` and record in `SECURITY_REVIEW.md`.
+- Measure with `forge test --gas-report` when a contract is non-trivial, and record key numbers in `contracts/SECURITY_REVIEW.md`.
 
 ## Testing
 
@@ -79,11 +79,11 @@ Every mutation of storage emits an event. No silent writes. Index the fields off
 - `forge coverage --report lcov` must show 100% on the contract's public surface.
 - Every revert path has a dedicated test using `vm.expectRevert(CustomError.selector)`.
 - Fuzz any function accepting strings, addresses, or numbers unbounded by the type system.
-- Invariant tests for properties that must hold across all sequences of calls (e.g., `_nextId` is monotonic).
+- Invariant tests for any property that must hold across all sequences of calls.
 
 ## Upgradeability
 
-The MVP is **not** upgradeable. Do not use OpenZeppelin's `Upgradeable` variants. Do not deploy behind a proxy. This is locked in `docs/02_ARCHITECTURE.md`.
+Contracts in this repo are **not** upgradeable. Do not use OpenZeppelin's `Upgradeable` variants. Do not deploy behind a proxy.
 
 ## Security review
 

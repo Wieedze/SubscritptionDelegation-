@@ -9,8 +9,8 @@ The codebase has three layers. Mixing them is a defect.
 | Layer | Responsibility | Examples |
 |---|---|---|
 | **Domain / contracts** | On-chain state and invariants. Pure business logic. | `contracts/src/*.sol` |
-| **Services** | Off-chain logic that talks to chain, Intuition, IPFS. No UI concerns. | `app/src/services/*.ts`, `app/src/lib/*.ts` |
-| **Presentation** | React components, hooks, pages. No business logic, no direct chain calls. | `app/src/components/*.tsx`, `app/src/pages/*.tsx` |
+| **Services** | Off-chain logic that talks to chain, the delegation toolkit, the 1Shot relayer, IPFS. No UI concerns. | `packages/core/src/*.ts` |
+| **Presentation** | React components, hooks, pages. No business logic, no direct chain calls. | `packages/web/src/*.tsx` |
 
 Rules:
 
@@ -34,7 +34,7 @@ Do **not** use OOP when:
 - A pure function is enough. A `formatDomain(domain: string): string` is a function, not a `DomainFormatter` class.
 - The class would have zero state and one method. That is a function in a hat.
 
-In Solidity, OOP = contracts and libraries. Inheritance is allowed only when it reduces duplication of substantial logic. Diamond/proxy patterns are out of scope for the MVP (see `docs/02_ARCHITECTURE.md`).
+In Solidity, OOP = contracts and libraries. Inheritance is allowed only when it reduces duplication of substantial logic. Diamond/proxy patterns are out of scope for this POC.
 
 ## TypeScript hard rules
 

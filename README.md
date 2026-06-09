@@ -1,7 +1,8 @@
 # safe-subscriptions
 
-Recurring crypto subscriptions on **Sepolia** using the **MetaMask Delegation
-Toolkit** (ERC-7710 / ERC-4337).
+Recurring crypto subscriptions on **Ethereum testnets** using the **MetaMask
+Delegation Toolkit** (ERC-7710 / ERC-4337). The CLI flows run on **Sepolia**; the
+web app runs on **Base Sepolia**.
 
 A subscriber's **smart account** (Hybrid DeleGator, controlled by an EOA) signs a
 single **delegation** that lets an **organization** pull a fixed ERC20 amount each
@@ -127,7 +128,7 @@ The web app (`packages/web`) implements the most MetaMask-native path: the user
 approves a recurring `erc20-token-periodic` permission **directly in MetaMask**
 (ERC-7715), and the first period is charged gaslessly through the 1Shot relayer.
 
-- Set `VITE_RPC_URL` in `packages/web/.env.local`.
+- Runs on **Base Sepolia** (an L2, so gas is negligible). Set `VITE_RPC_URL` in `packages/web/.env.local`.
 - Requires a wallet that supports ERC-7715 (**MetaMask ≥13.23 or Flask ≥13.5**).
 
 ```bash
@@ -145,7 +146,7 @@ bun run --filter @safe-subscriptions/web dev
 
 ## Notes / limits (POC)
 
-- Single chain: Sepolia. ERC20 only (native tokens aren't pullable via allowance).
+- CLI flows run on Sepolia; the web app runs on Base Sepolia. ERC20 only (native tokens aren't pullable via allowance).
 - Storage is a local JSON file (CLI) / localStorage (web) — no backend.
 - Revocation requires a bundler; charging does not.
 - `MockERC20` is open-mint and **not** production-safe.

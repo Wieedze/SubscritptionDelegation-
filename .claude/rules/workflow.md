@@ -4,7 +4,7 @@ Load at the start and end of **every** task.
 
 ## Scope discipline
 
-The MVP scope is in `docs/03_MVP_SCOPE.md`. If a task seems to need something outside that scope, **stop and ask**.
+This repo is a focused POC: recurring ERC20 subscriptions on the MetaMask Delegation Toolkit. If a task seems to need something outside that, **stop and ask**.
 
 Drift signals — when you catch yourself thinking any of these, stop:
 
@@ -18,7 +18,7 @@ Every signal triggers a stop. Either the user authorizes the scope expansion exp
 
 ## Git hygiene
 
-- **Conventional commits.** `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`. Scope prefix when useful: `feat(contract): …`.
+- **Conventional commits.** `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`. Scope prefix when useful: `feat(core): …`, `feat(web): …`, `feat(contract): …`.
 - **Atomic commits.** One logical change per commit. Tests that go with a feature ship in the same commit as the feature.
 - **No "fix typo" commits after the fact.** Either squash before the PR is up, or live with it.
 - **No `--no-verify`.** If a hook fails, fix the underlying issue.
@@ -26,7 +26,7 @@ Every signal triggers a stop. Either the user authorizes the scope expansion exp
 
 ## Communication style (when reporting to the user)
 
-End-of-task report has three parts and no more (four for hackathon tasks — see below):
+End-of-task report has three parts and no more:
 
 ```
 **What shipped**
@@ -39,17 +39,6 @@ End-of-task report has three parts and no more (four for hackathon tasks — see
 <the next logical task, or what the user needs to unblock>
 ```
 
-### Hackathon-task addendum (Tasks 02b, 03b, 04b, 05b only)
-
-For tasks tied to the MetaMask Dev Cook-Off submission, add a fourth bullet:
-
-```
-**Does this preserve the hackathon submission narrative?**
-<one sentence: yes/no, with reasoning. Reference the narrative in docs/00_HACKATHON_PIVOT.md.>
-```
-
-If the answer is "no", the implementation has drifted and must be reviewed before merging. The `task-verifier` agent checks this answer is present and substantive on hackathon-tagged tasks.
-
 Do not:
 - Write multi-paragraph narratives unless asked.
 - Use emoji.
@@ -59,23 +48,19 @@ Do not:
 - Restate the task back before doing it.
 - Write filler ("I'll now proceed to...").
 
-## Task verification protocol (mandatory)
+## Change verification
 
-A task is **not** complete until the `task-verifier` agent has returned a pass. The protocol:
+A change is **not** complete until it has been verified against the rules and the deliverable actually works. The protocol:
 
 1. Finish the implementation work.
-2. Run any task-specific checks listed in the task file (tests, coverage, lint).
-3. Invoke the `task-verifier` agent with the task file path and a summary of what was produced.
-4. The agent reads the task spec, the rules, and the deliverables, then returns pass/fail + reasoning.
-5. If fail → fix and re-run from step 3. Do not declare done.
-6. If pass → write a post-mortem entry in `.claude/learning/` using the template.
-7. Mark the task file with a completion note (date, commit SHA, post-mortem reference).
-
-The `task-verifier` is in `.claude/agents/task-verifier.md`.
+2. Run the relevant checks: `bun run typecheck` for TS; `forge test` (+ `forge coverage`) for contracts; the web app builds with `bun run --filter @safe-subscriptions/web build`.
+3. For contract changes, run the `contract-reviewer` agent. For web/UI changes, run the `ui-reviewer` agent.
+4. Spot-check the change against the loaded rules (no `any`, custom errors, NatSpec, no dead code).
+5. If a check fails → fix and re-run. Do not declare done.
 
 ## Recording decisions
 
-If during a task you make a non-obvious decision (a design tradeoff, a deviation from an obvious approach, an architectural choice not pre-specified), write an ADR in `.claude/choices/` using the template. Reference the ADR in the task's post-mortem.
+If during a task you make a non-obvious decision (a design tradeoff, a deviation from an obvious approach, an architectural choice not pre-specified), write an ADR in `.claude/choices/` using the template.
 
 Examples of "non-obvious" worth recording:
 - Choosing one library over another that was also viable.
@@ -92,10 +77,10 @@ Things **not** worth an ADR:
 
 Stop and ask, do not guess, when:
 
-- A task file contradicts an architecture doc.
+- A task contradicts an architecture doc (`docs/ARCHITECTURE_PROD.md`, `KICKOFF.md`).
 - The user's instruction would expand scope.
-- An Intuition atom schema or integration detail is ambiguous.
-- The deployment target is ambiguous (default Base Sepolia, but confirm if mainnet is implied).
+- A delegation / caveat encoding detail is ambiguous (which caveat, which terms, which chain).
+- The deployment target is ambiguous (CLI/core default Sepolia, web default Base Sepolia — confirm if mainnet is implied).
 - A rule and a task spec disagree.
 
 Ten minutes of clarification saves a day of rework. The cost of asking is near zero. The cost of guessing wrong is the cost of the rework plus the trust damage.

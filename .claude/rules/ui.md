@@ -1,6 +1,6 @@
 # UI rules
 
-Load for every task touching `app/`. Compose with `docs/05_UI_DESIGN.md` which holds the visual spec.
+Load for every task touching `packages/web/`. The web app is a Vite + React + wagmi single-page app; there is no separate visual-spec doc — these rules are the spec.
 
 ## Anti-templates
 
@@ -32,7 +32,7 @@ Strip these reflexes. If you find yourself reaching for one, stop.
 ## Layout
 
 - Max content width is intentional, not the viewport.
-- Lists are dense by default. A list of modules shows ~15+ rows above the fold on a 13" laptop.
+- Lists are dense by default. A list of subscriptions shows ~15+ rows above the fold on a 13" laptop.
 - Detail views use a two-column layout: metadata on the left, content on the right. Not stacked.
 - Forms are single-column. Labels above inputs, never beside.
 
@@ -52,8 +52,8 @@ Strip these reflexes. If you find yourself reaching for one, stop.
 ## Performance
 
 - Bundle size is monitored. Adding a dependency to the UI requires justification in the PR description.
-- Lazy-load route-level code. No eager-loading of the entire app.
-- Images are explicit `<Image>` (Next.js) with dimensions. No layout shift.
+- Lazy-load heavy code paths. No eager-loading of the entire app.
+- Images carry explicit dimensions to avoid layout shift.
 
 ## Review
 

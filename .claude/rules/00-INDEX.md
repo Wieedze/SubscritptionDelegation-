@@ -6,10 +6,10 @@ Each rule file is self-contained. Load only those relevant to the current task �
 |---|---|---|
 | `code.md` | Clean code, OOP, service/logic separation, no `any`, no dead code | Any task that writes or modifies code |
 | `solidity.md` | Solidity 0.8+ patterns, NatSpec, custom errors, events, gas | Any task touching `contracts/` |
-| `ui.md` | Typography-driven design, dark-first, anti-template rules | Any task touching `app/` |
+| `ui.md` | Typography-driven design, dark-first, anti-template rules | Any task touching `packages/web/` |
 | `security.md` | Threat model checklist, when to invoke Trail of Bits | Any contract change or value-handling code |
-| `workflow.md` | Git hygiene, scope discipline, communication style, task verification protocol | Every task — load at start and at end |
-| `metamask-delegation.md` | ICaveatEnforcer, ERC-7710 delegation, Smart Accounts Kit, x402 buyer-with-delegations | Tasks 02b, 03b, 04b, 05b — any work touching MetaMask delegation surface |
+| `workflow.md` | Git hygiene, scope discipline, communication style, change verification | Every task — load at start and at end |
+| `metamask-delegation.md` | ERC-7710/7702 delegation, the `erc20PeriodTransfer` caveat, Smart Accounts Kit, the 1Shot relayer | Any work touching the MetaMask delegation surface (`packages/core`, `packages/web`, `scripts/`) |
 
 ## Update protocol
 

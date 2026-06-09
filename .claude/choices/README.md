@@ -10,7 +10,7 @@ Write one when:
 - An architectural boundary was placed.
 - A rule was changed (either tightened or relaxed).
 - A dependency was added.
-- A scope decision was made that wasn't already in `docs/03_MVP_SCOPE.md`.
+- A scope decision was made that wasn't already covered by the rules or `KICKOFF.md`.
 - A deviation from an obvious approach was chosen, with reason.
 
 Do **not** write an ADR for:
