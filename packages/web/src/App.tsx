@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAccount, useConnect, useDisconnect } from "wagmi";
 import { baseSepolia } from "wagmi/chains";
+import { ipfsToHttp } from "@safe-subscriptions/core";
 import { Subscribe } from "./Subscribe.js";
 import { listSubscriptions, removeSubscription, type RelayedSubscription } from "./store.js";
 import { shortAddr } from "./lib.js";
@@ -64,6 +65,23 @@ export function App() {
                   </strong>{" "}
                   every {s.periodDays} days
                   <div className="muted small">to {shortAddr(s.recipient)}</div>
+                  {s.agreement && (
+                    <div className="muted small">
+                      contract:{" "}
+                      {s.agreement.uri.startsWith("ipfs://local-") ? (
+                        <span title={s.agreement.termsHash}>offline ({s.agreement.cid})</span>
+                      ) : (
+                        <a
+                          href={ipfsToHttp(s.agreement.uri)}
+                          target="_blank"
+                          rel="noreferrer"
+                          title={`terms hash ${s.agreement.termsHash}`}
+                        >
+                          {s.agreement.uri}
+                        </a>
+                      )}
+                    </div>
+                  )}
                   {s.txHash && (
                     <div className="muted small">
                       first charge:{" "}

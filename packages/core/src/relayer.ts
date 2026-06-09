@@ -176,12 +176,14 @@ export async function signRelayerSubscriptionDelegation(params: {
   periodAmount: bigint;
   periodSeconds: number;
   startDate: number;
+  /** Bind the signature to off-chain terms by passing keccak256(terms) as salt. */
+  salt?: Hex;
 }): Promise<Delegation> {
   const unsigned = createDelegation({
     to: params.targetAddress,
     from: params.smartAccount.address,
     environment: params.smartAccount.environment,
-    salt: randomSalt(),
+    salt: params.salt ?? randomSalt(),
     scope: {
       type: ScopeType.Erc20PeriodTransfer,
       tokenAddress: params.token.address,

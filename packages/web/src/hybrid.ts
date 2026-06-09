@@ -3,6 +3,7 @@ import {
   parseUnits,
   type Account,
   type Address,
+  type Hex,
   type Chain,
   type PublicClient,
   type Transport,
@@ -18,6 +19,7 @@ import {
   signRelayerSubscriptionDelegation,
   MONTHLY_SECONDS,
 } from "@safe-subscriptions/core";
+import { buildAndPinAgreement } from "./agreement.js";
 
 /**
  * Production no-Flask flow. The connected EOA controls a **Hybrid DeleGator**
@@ -37,14 +39,23 @@ export async function subscribeHybridViaRelayer(params: {
   recipient: Address;
   periodDays: number;
   onStatus?: (message: string) => void;
-}): Promise<{ taskId: string; txHash?: string; smartAccount: Address }> {
+}): Promise<{
+  taskId: string;
+  txHash?: string;
+  smartAccount: Address;
+  agreement: { cid: string; uri: string; termsHash: Hex };
+}> {
   const { onStatus = () => {}, publicClient, walletClient } = params;
   const relayerUrl = relayerUrlForChain(params.chainId);
 
   const caps = await getCapabilities(relayerUrl, params.chainId);
   const usdc = caps.tokens.find((t) => t.symbol === "USDC") ?? caps.tokens[0];
   if (!usdc) throw new Error("1Shot relayer reports no accepted tokens on this chain.");
-  const token = { address: usdc.address as Address, decimals: Number(usdc.decimals) };
+  const token = {
+    address: usdc.address as Address,
+    symbol: usdc.symbol ?? "USDC",
+    decimals: Number(usdc.decimals),
+  };
 
   const workAmount = parseUnits(params.amount, token.decimals);
   // Headroom for the USDC-priced relayer fee. On an L2 (Base) the fee is a
@@ -81,15 +92,32 @@ export async function subscribeHybridViaRelayer(params: {
     await publicClient.waitForTransactionReceipt({ hash: tx });
   }
 
-  // 3. Sign the period delegation (EIP-712 — any MetaMask).
+  // 3. Build + pin the human-readable contract, then sign the delegation with
+  //    salt = keccak256(terms) so the signature commits to the exact terms.
+  const startDate = Math.floor(Date.now() / 1000);
+  const periodSeconds = Math.round(params.periodDays * 86400) || MONTHLY_SECONDS;
+  onStatus("Pinning the subscription contract to IPFS…");
+  const { pinned, salt } = await buildAndPinAgreement({
+    chainId: params.chainId,
+    smartAccount: smartAccount.address,
+    owner: walletClient.account.address,
+    recipient: params.recipient,
+    relayerTarget: caps.targetAddress,
+    token,
+    amount: params.amount,
+    periodSeconds,
+    startDate,
+  });
+
   onStatus("Sign the recurring subscription delegation in MetaMask…");
   const signedDelegation = await signRelayerSubscriptionDelegation({
     smartAccount,
     targetAddress: caps.targetAddress,
     token,
     periodAmount,
-    periodSeconds: Math.round(params.periodDays * 86400) || MONTHLY_SECONDS,
-    startDate: Math.floor(Date.now() / 1000),
+    periodSeconds,
+    startDate,
+    salt,
   });
 
   // 4. Charge the first period gaslessly via 1Shot.
@@ -105,15 +133,24 @@ export async function subscribeHybridViaRelayer(params: {
     client: publicClient,
   });
 
+  const agreement = { cid: pinned.cid, uri: pinned.uri, termsHash: salt };
+
   onStatus("Waiting for the relayer to confirm on-chain…");
   try {
     const status = await pollRelayerUntilDone(relayerUrl, taskId, { timeoutMs: 60_000 });
     if (status.status === 400 || status.status === 500) {
       throw new Error(`Relayer rejected the task (${status.status}): ${status.message ?? ""}`);
     }
-    return { taskId, txHash: status.receipt?.transactionHash ?? status.hash, smartAccount: smartAccount.address };
+    return {
+      taskId,
+      txHash: status.receipt?.transactionHash ?? status.hash,
+      smartAccount: smartAccount.address,
+      agreement,
+    };
   } catch (err) {
-    if (/Timeout/.test((err as Error).message)) return { taskId, smartAccount: smartAccount.address };
+    if (/Timeout/.test((err as Error).message)) {
+      return { taskId, smartAccount: smartAccount.address, agreement };
+    }
     throw err;
   }
 }

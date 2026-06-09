@@ -12,7 +12,7 @@ import {
 } from "viem";
 import { grantAndChargeViaRelayer } from "./erc7715.js";
 import { subscribeHybridViaRelayer } from "./hybrid.js";
-import { saveSubscription } from "./store.js";
+import { saveSubscription, type RelayedSubscription } from "./store.js";
 
 type Method = "hybrid" | "erc7715";
 
@@ -53,19 +53,24 @@ export function Subscribe(props: { onCreated: () => void }) {
         periodDays: Number(periodDays),
         onStatus: setStatus,
       };
-      const { taskId, txHash } =
+      const result =
         method === "hybrid"
           ? await subscribeHybridViaRelayer({ ...common, publicClient: pc })
           : await grantAndChargeViaRelayer({ ...common, publicClient: pc });
 
       saveSubscription({
-        id: taskId,
+        id: result.taskId,
         createdAt: new Date().toISOString(),
         amount,
         periodDays: Number(periodDays),
         recipient: resolvedRecipient,
-        taskId,
-        txHash,
+        taskId: result.taskId,
+        txHash: result.txHash,
+        // Only the hybrid flow binds + pins a contract; ERC-7715 has none.
+        agreement:
+          "agreement" in result
+            ? (result.agreement as RelayedSubscription["agreement"])
+            : undefined,
       });
       setStatus(null);
       props.onCreated();

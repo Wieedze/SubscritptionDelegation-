@@ -7,6 +7,8 @@ export interface RelayedSubscription {
   recipient: string;
   taskId: string;
   txHash?: string;
+  /** Human-readable contract pinned to IPFS, hash bound to the signature. */
+  agreement?: { cid: string; uri: string; termsHash: string };
 }
 
 const KEY = "safe-subscriptions/relayed";
