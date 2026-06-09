@@ -3,14 +3,15 @@ import { usePublicClient, useWalletClient } from "wagmi";
 import { sepolia } from "wagmi/chains";
 import { getAddress, type Address } from "viem";
 import { grantAndChargeViaRelayer } from "./erc7715.js";
-import { subscribeDirectViaRelayer } from "./direct.js";
+import { subscribeHybridViaRelayer } from "./hybrid.js";
 import { saveSubscription } from "./store.js";
 
-type Method = "direct" | "erc7715";
+type Method = "hybrid" | "erc7715";
 
 /**
  * The single subscription flow, charged gaslessly via 1Shot.
- *  - "direct": the wallet signs the delegation (EIP-712) — works with any MetaMask.
+ *  - "hybrid": deploy a Hybrid smart account + sign the delegation (EIP-712).
+ *    Works with any MetaMask — the production path, no Flask.
  *  - "erc7715": MetaMask Advanced Permissions (ERC-7715) — needs Flask / MM ≥13.23.
  */
 export function Subscribe(props: { onCreated: () => void }) {
@@ -19,7 +20,7 @@ export function Subscribe(props: { onCreated: () => void }) {
   const [amount, setAmount] = useState("0.1");
   const [recipient, setRecipient] = useState("");
   const [periodDays, setPeriodDays] = useState("30");
-  const [method, setMethod] = useState<Method>("direct");
+  const [method, setMethod] = useState<Method>("hybrid");
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,8 +42,8 @@ export function Subscribe(props: { onCreated: () => void }) {
         onStatus: setStatus,
       };
       const { taskId, txHash } =
-        method === "direct"
-          ? await subscribeDirectViaRelayer({ ...common, publicClient })
+        method === "hybrid"
+          ? await subscribeHybridViaRelayer({ ...common, publicClient })
           : await grantAndChargeViaRelayer(common);
 
       saveSubscription({
@@ -87,7 +88,7 @@ export function Subscribe(props: { onCreated: () => void }) {
         <label>
           Authorization method
           <select value={method} onChange={(e) => setMethod(e.target.value as Method)}>
-            <option value="direct">Direct signature (any MetaMask)</option>
+            <option value="hybrid">Smart account (any MetaMask)</option>
             <option value="erc7715">Advanced Permissions · ERC-7715 (Flask)</option>
           </select>
         </label>
