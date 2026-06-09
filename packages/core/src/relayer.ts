@@ -230,19 +230,30 @@ export async function chargeBundleViaRelayer(params: ChargeBundleParams): Promis
     ],
   });
 
-  // Estimate with a mock fee (0.01 of the fee token), then use the required amount.
+  // 1. Estimate with a mock fee to discover the required payment.
   const mockFee = 10_000n; // 0.01 USDC (6 decimals)
-  const estimate = await rpc<Estimate7710Result>(
+  const first = await rpc<Estimate7710Result>(
     params.relayerUrl,
     "relayer_estimate7710Transaction",
     buildBundle(mockFee),
   );
-  if (!estimate.success) throw new Error(`1Shot estimate failed: ${estimate.error}`);
+  if (!first.success) throw new Error(`1Shot estimate failed: ${first.error}`);
 
-  const requiredFee = BigInt(estimate.requiredPaymentAmount ?? mockFee.toString());
+  const requiredFee = BigInt(first.requiredPaymentAmount ?? mockFee.toString());
+  // 2. Pay with a small buffer (3% + 5000 atoms) to absorb gas-price drift between
+  //    estimate and execution, then re-estimate so the price-lock context matches.
+  const feeToPay = requiredFee + (requiredFee * 3n) / 100n + 5_000n;
+  const second = await rpc<Estimate7710Result>(
+    params.relayerUrl,
+    "relayer_estimate7710Transaction",
+    buildBundle(feeToPay),
+  );
+  if (!second.success) throw new Error(`1Shot re-estimate failed: ${second.error}`);
+
+  // 3. Send with the buffered fee and the matching price-lock context.
   return rpc<string>(params.relayerUrl, "relayer_send7710Transaction", {
-    ...buildBundle(requiredFee),
-    context: estimate.context,
+    ...buildBundle(feeToPay),
+    context: second.context,
   });
 }
 

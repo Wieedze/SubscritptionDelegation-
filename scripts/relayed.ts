@@ -65,9 +65,11 @@ async function main() {
     args: [subscriber.address],
   });
   const workAmount = parseUnits("0.1", token.decimals); // 0.1 USDC / period
-  const periodAmount = parseUnits("0.5", token.decimals); // cap: amount + fee headroom
+  // Cap = subscription amount + generous fee headroom (the first charge also pays
+  // the one-time EIP-7702 upgrade gas, billed in USDC by the relayer).
+  const periodAmount = parseUnits("5", token.decimals);
   console.log("USDC balance       :", formatUnits(usdcBalance, token.decimals), "USDC");
-  if (usdcBalance < workAmount + parseUnits("0.05", token.decimals)) {
+  if (usdcBalance < workAmount + parseUnits("1", token.decimals)) {
     throw new Error(
       `Subscriber needs Sepolia USDC. Fund ${subscriber.address} via https://faucet.circle.com`,
     );
