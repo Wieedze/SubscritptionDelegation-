@@ -107,6 +107,7 @@ async function main() {
     workAmount,
     recipient,
     authorization,
+    client,
   });
   console.log("Submitted to relayer. taskId:", taskId);
 

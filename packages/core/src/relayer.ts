@@ -107,6 +107,41 @@ interface Estimate7710Result {
   error?: string;
 }
 
+/**
+ * Guard against the relayer's gas oracle misreporting (observed on the 1Shot
+ * testnet relayer: ~3900 gwei reported vs ~33 gwei on-chain), which produces an
+ * absurd fee and a cryptic `transfer-amount-exceeded` revert. Throws a clear
+ * error when the relayer's gas price is wildly above the chain's.
+ */
+export async function assertRelayerGasSane(params: {
+  client: PublicClient;
+  relayerUrl: string;
+  chainId: number;
+  token: Address;
+  maxRatio?: number;
+}): Promise<void> {
+  let relayerGas: bigint;
+  try {
+    const fd = await rpc<{ gasPrice: Hex }>(params.relayerUrl, "relayer_getFeeData", {
+      chainId: String(params.chainId),
+      token: params.token,
+    });
+    relayerGas = BigInt(fd.gasPrice);
+  } catch {
+    return; // can't read relayer fee data — let the estimate surface the error
+  }
+  const chainGas = await params.client.getGasPrice();
+  if (chainGas === 0n) return;
+  const ratio = Number(relayerGas) / Number(chainGas);
+  if (ratio > (params.maxRatio ?? 10)) {
+    throw new Error(
+      `1Shot relayer gas oracle looks wrong: ${Math.round(Number(relayerGas) / 1e9)} gwei vs ` +
+        `chain ${Math.round(Number(chainGas) / 1e9)} gwei (${Math.round(ratio)}x). ` +
+        `This is a transient relayer-side issue — try again later.`,
+    );
+  }
+}
+
 /** A random 32-byte salt, runtime-agnostic (node 20+ / browser). */
 export function randomSalt(): Hex {
   return bytesToHex(crypto.getRandomValues(new Uint8Array(32)));
@@ -240,6 +275,8 @@ export interface ChargeBundleParams {
   recipient: Address;
   /** Optional EIP-7702 authorization (first use only, before the EOA is upgraded). */
   authorization?: unknown;
+  /** When set, guard against the relayer's gas oracle misreporting before charging. */
+  client?: PublicClient;
 }
 
 /**
@@ -251,6 +288,15 @@ export interface ChargeBundleParams {
  */
 export async function chargeBundleViaRelayer(params: ChargeBundleParams): Promise<string> {
   const { capabilities: caps, token } = params;
+
+  if (params.client) {
+    await assertRelayerGasSane({
+      client: params.client,
+      relayerUrl: params.relayerUrl,
+      chainId: params.chainId,
+      token: token.address,
+    });
+  }
 
   const buildBundle = (feeAmount: bigint) => ({
     chainId: String(params.chainId),
@@ -300,7 +346,16 @@ export async function chargeBundleViaRelayer(params: ChargeBundleParams): Promis
     "relayer_estimate7710Transaction",
     buildBundle(feeToPay),
   );
-  if (!second.success) throw new Error(`1Shot re-estimate failed: ${second.error}`);
+  if (!second.success) {
+    if (/transfer-amount-exceeded|exceeds balance/i.test(second.error ?? "")) {
+      throw new Error(
+        `The relayer fee (~${(Number(feeToPay) / 10 ** token.decimals).toFixed(2)} ${token.decimals === 6 ? "USDC" : "tokens"}) ` +
+          `exceeds the subscription's period cap or the account's balance — network gas is high right now. ` +
+          `Try again when gas is lower, or raise the period cap / fund more.`,
+      );
+    }
+    throw new Error(`1Shot re-estimate failed: ${second.error}`);
+  }
 
   // 3. Send with the buffered fee and the matching price-lock context.
   return rpc<string>(params.relayerUrl, "relayer_send7710Transaction", {
@@ -318,6 +373,7 @@ export interface ChargeViaRelayerParams {
   workAmount: bigint;
   recipient: Address;
   authorization?: unknown;
+  client?: PublicClient;
 }
 
 /** Local-signer convenience wrapper around {@link chargeBundleViaRelayer}. */

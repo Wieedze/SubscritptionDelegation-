@@ -1,4 +1,4 @@
-import { parseUnits, type Account, type Address, type Chain, type Transport, type WalletClient } from "viem";
+import { parseUnits, type Account, type Address, type Chain, type PublicClient, type Transport, type WalletClient } from "viem";
 import { erc7715ProviderActions } from "@metamask/smart-accounts-kit/actions";
 import { decodeDelegations } from "@metamask/smart-accounts-kit/utils";
 import {
@@ -20,6 +20,7 @@ import {
  */
 export async function grantAndChargeViaRelayer(params: {
   walletClient: WalletClient<Transport, Chain, Account>;
+  publicClient?: PublicClient;
   chainId: number;
   /** Human subscription amount per period, e.g. "0.1". */
   amount: string;
@@ -74,6 +75,7 @@ export async function grantAndChargeViaRelayer(params: {
     token,
     workAmount,
     recipient: params.recipient,
+    client: params.publicClient,
   });
 
   onStatus("Waiting for the relayer to confirm on-chain…");

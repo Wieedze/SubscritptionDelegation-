@@ -101,6 +101,7 @@ export async function subscribeHybridViaRelayer(params: {
     token,
     workAmount,
     recipient: params.recipient,
+    client: publicClient,
   });
 
   onStatus("Waiting for the relayer to confirm on-chain…");

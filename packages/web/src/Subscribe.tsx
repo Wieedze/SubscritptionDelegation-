@@ -44,7 +44,7 @@ export function Subscribe(props: { onCreated: () => void }) {
       const { taskId, txHash } =
         method === "hybrid"
           ? await subscribeHybridViaRelayer({ ...common, publicClient })
-          : await grantAndChargeViaRelayer(common);
+          : await grantAndChargeViaRelayer({ ...common, publicClient });
 
       saveSubscription({
         id: taskId,
