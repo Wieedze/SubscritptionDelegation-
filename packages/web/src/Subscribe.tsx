@@ -1,40 +1,50 @@
 import { useState, type FormEvent } from "react";
-import { useWalletClient } from "wagmi";
+import { usePublicClient, useWalletClient } from "wagmi";
 import { sepolia } from "wagmi/chains";
 import { getAddress, type Address } from "viem";
 import { grantAndChargeViaRelayer } from "./erc7715.js";
+import { subscribeDirectViaRelayer } from "./direct.js";
 import { saveSubscription } from "./store.js";
 
+type Method = "direct" | "erc7715";
+
 /**
- * The single subscription flow: grant a recurring USDC permission (ERC-7715)
- * in MetaMask, then charge period one gaslessly through the 1Shot relayer.
- * No smart-account deploy, no ETH, no bundler.
+ * The single subscription flow, charged gaslessly via 1Shot.
+ *  - "direct": the wallet signs the delegation (EIP-712) — works with any MetaMask.
+ *  - "erc7715": MetaMask Advanced Permissions (ERC-7715) — needs Flask / MM ≥13.23.
  */
 export function Subscribe(props: { onCreated: () => void }) {
   const { data: walletClient } = useWalletClient();
+  const publicClient = usePublicClient();
   const [amount, setAmount] = useState("0.1");
   const [recipient, setRecipient] = useState("");
   const [periodDays, setPeriodDays] = useState("30");
+  const [method, setMethod] = useState<Method>("direct");
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!walletClient) {
+    if (!walletClient || !publicClient) {
       setError("Wallet not ready.");
       return;
     }
     try {
       const resolvedRecipient = getAddress(recipient || walletClient.account.address) as Address;
-      const { taskId, txHash } = await grantAndChargeViaRelayer({
+      const common = {
         walletClient,
         chainId: sepolia.id,
         amount,
         recipient: resolvedRecipient,
         periodDays: Number(periodDays),
         onStatus: setStatus,
-      });
+      };
+      const { taskId, txHash } =
+        method === "direct"
+          ? await subscribeDirectViaRelayer({ ...common, publicClient })
+          : await grantAndChargeViaRelayer(common);
+
       saveSubscription({
         id: taskId,
         createdAt: new Date().toISOString(),
@@ -56,8 +66,8 @@ export function Subscribe(props: { onCreated: () => void }) {
     <section className="card">
       <h2>New subscription</h2>
       <p className="muted small">
-        Recurring USDC subscription. You approve a periodic permission in MetaMask
-        (ERC-7715); the first charge is relayed gaslessly by 1Shot — no ETH needed.
+        Recurring USDC subscription. You approve it once; the first charge is relayed
+        gaslessly by 1Shot — no ETH needed.
       </p>
       <form className="form" onSubmit={submit}>
         <div className="form__row">
@@ -73,6 +83,13 @@ export function Subscribe(props: { onCreated: () => void }) {
         <label>
           Recipient (defaults to you)
           <input placeholder="0x…" value={recipient} onChange={(e) => setRecipient(e.target.value)} />
+        </label>
+        <label>
+          Authorization method
+          <select value={method} onChange={(e) => setMethod(e.target.value as Method)}>
+            <option value="direct">Direct signature (any MetaMask)</option>
+            <option value="erc7715">Advanced Permissions · ERC-7715 (Flask)</option>
+          </select>
         </label>
         <button type="submit" disabled={status != null}>
           Subscribe (gasless via 1Shot)

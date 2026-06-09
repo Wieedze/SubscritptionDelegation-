@@ -4,9 +4,12 @@ import {
   erc20Abi,
   type Account,
   type Address,
+  type Chain,
   type Hex,
   type LocalAccount,
   type PublicClient,
+  type Transport,
+  type WalletClient,
 } from "viem";
 import {
   createDelegation,
@@ -154,6 +157,45 @@ export async function signRelayerSubscriptionDelegation(params: {
   });
   const signature = await params.smartAccount.signDelegation({ delegation: unsigned });
   return { ...unsigned, signature };
+}
+
+/**
+ * Browser variant: build the subscriber's EIP-7702 smart account using the
+ * connected wallet as signer. `signDelegation` then prompts the wallet to sign
+ * the delegation as EIP-712 typed data — no ERC-7715, works with any MetaMask.
+ */
+export async function createStateless7702FromWallet(params: {
+  client: PublicClient;
+  walletClient: WalletClient<Transport, Chain | undefined, Account>;
+}): Promise<MetaMaskSmartAccount> {
+  return toMetaMaskSmartAccount({
+    client: params.client,
+    implementation: Implementation.Stateless7702,
+    address: params.walletClient.account.address,
+    signer: { walletClient: params.walletClient },
+  });
+}
+
+/** Browser variant of the EIP-7702 authorization, signed by the connected wallet. */
+export async function build7702AuthorizationFromWallet(params: {
+  walletClient: WalletClient<Transport, Chain | undefined, Account>;
+  environment: SmartAccountsEnvironment;
+}): Promise<unknown> {
+  const impl = params.environment.implementations.EIP7702StatelessDeleGatorImpl as Address;
+  // Sponsored flow: 1Shot's targetAddress executes the tx, so omit `executor`
+  // (viem then uses the EOA's current nonce, not current+1).
+  const auth = await params.walletClient.signAuthorization({
+    account: params.walletClient.account,
+    contractAddress: impl,
+  });
+  return {
+    address: auth.address,
+    chainId: auth.chainId,
+    nonce: auth.nonce,
+    r: auth.r,
+    s: auth.s,
+    yParity: auth.yParity ?? 0,
+  };
 }
 
 /** EIP-7702 authorization entry upgrading the EOA to the stateless delegator. */
