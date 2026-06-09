@@ -47,9 +47,10 @@ export async function subscribeHybridViaRelayer(params: {
   const token = { address: usdc.address as Address, decimals: Number(usdc.decimals) };
 
   const workAmount = parseUnits(params.amount, token.decimals);
-  const periodAmount = workAmount + parseUnits("15", token.decimals);
-  // Enough USDC in the smart account to cover the subscription + the USDC-priced fee.
-  const needed = workAmount + parseUnits("8", token.decimals);
+  // Headroom for the USDC-priced relayer fee. On an L2 (Base) the fee is a
+  // fraction of a cent, so a small buffer is plenty.
+  const periodAmount = workAmount + parseUnits("3", token.decimals);
+  const needed = workAmount + parseUnits("2", token.decimals);
 
   const smartAccount = await createSmartAccountFromWallet({ client: publicClient, walletClient });
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAccount, useConnect, useDisconnect } from "wagmi";
-import { sepolia } from "wagmi/chains";
+import { baseSepolia } from "wagmi/chains";
 import { Subscribe } from "./Subscribe.js";
 import { listSubscriptions, removeSubscription, type RelayedSubscription } from "./store.js";
 import { shortAddr } from "./lib.js";
@@ -14,14 +14,14 @@ export function App() {
   const refresh = useCallback(() => setSubs(listSubscriptions()), []);
   useEffect(refresh, [refresh]);
 
-  const wrongChain = isConnected && chainId !== sepolia.id;
+  const wrongChain = isConnected && chainId !== baseSepolia.id;
 
   return (
     <main className="app">
       <header className="app__header">
         <h1>safe-subscriptions</h1>
         <p className="muted">
-          Gasless recurring USDC subscriptions · MetaMask Smart Accounts (ERC-7715) + 1Shot · Sepolia
+          Gasless recurring USDC subscriptions · MetaMask Smart Accounts (ERC-7715) + 1Shot · Base Sepolia
         </p>
       </header>
 
@@ -45,7 +45,7 @@ export function App() {
             </div>
           </div>
         )}
-        {wrongChain && <p className="warn">Switch your wallet to Sepolia (chainId {sepolia.id}).</p>}
+        {wrongChain && <p className="warn">Switch your wallet to Base Sepolia (chainId {baseSepolia.id}).</p>}
       </section>
 
       {isConnected && !wrongChain && <Subscribe onCreated={refresh} />}
@@ -68,7 +68,7 @@ export function App() {
                     <div className="muted small">
                       first charge:{" "}
                       <a
-                        href={`https://sepolia.etherscan.io/tx/${s.txHash}`}
+                        href={`https://sepolia.basescan.org/tx/${s.txHash}`}
                         target="_blank"
                         rel="noreferrer"
                       >

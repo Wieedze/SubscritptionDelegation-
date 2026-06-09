@@ -1,7 +1,15 @@
 import { useState, type FormEvent } from "react";
 import { usePublicClient, useWalletClient } from "wagmi";
-import { sepolia } from "wagmi/chains";
-import { getAddress, type Address } from "viem";
+import { baseSepolia } from "wagmi/chains";
+import {
+  getAddress,
+  type Account,
+  type Address,
+  type Chain,
+  type PublicClient,
+  type Transport,
+  type WalletClient,
+} from "viem";
 import { grantAndChargeViaRelayer } from "./erc7715.js";
 import { subscribeHybridViaRelayer } from "./hybrid.js";
 import { saveSubscription } from "./store.js";
@@ -33,9 +41,13 @@ export function Subscribe(props: { onCreated: () => void }) {
     }
     try {
       const resolvedRecipient = getAddress(recipient || walletClient.account.address) as Address;
+      // wagmi resolves viem from its own peer-dedupe copy; the clients are
+      // structurally identical to ours, so re-type them at this boundary.
+      const wc = walletClient as unknown as WalletClient<Transport, Chain, Account>;
+      const pc = publicClient as unknown as PublicClient;
       const common = {
-        walletClient,
-        chainId: sepolia.id,
+        walletClient: wc,
+        chainId: baseSepolia.id,
         amount,
         recipient: resolvedRecipient,
         periodDays: Number(periodDays),
@@ -43,8 +55,8 @@ export function Subscribe(props: { onCreated: () => void }) {
       };
       const { taskId, txHash } =
         method === "hybrid"
-          ? await subscribeHybridViaRelayer({ ...common, publicClient })
-          : await grantAndChargeViaRelayer({ ...common, publicClient });
+          ? await subscribeHybridViaRelayer({ ...common, publicClient: pc })
+          : await grantAndChargeViaRelayer({ ...common, publicClient: pc });
 
       saveSubscription({
         id: taskId,
